@@ -2,6 +2,7 @@
 *.o
 *.a
 *.so
+jackproxy
 
 # Folders
 _obj
