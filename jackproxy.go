@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/vulcand/oxy/forward"
+	"github.com/vulcand/oxy/utils"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"github.com/vulcand/oxy/forward"
-	"github.com/vulcand/oxy/utils"
 	"os"
 	"strconv"
 )
@@ -35,7 +35,6 @@ func setupGlobalProxymap(path string) error {
 	return nil
 }
 
-
 // Healthcheck /healthz endpoint for the proxy itself.
 func healthzHandler(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusInternalServerError)
@@ -43,8 +42,6 @@ func healthzHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 type Rewriter struct {
-	TrustForwardHeader bool
-	Hostname           string
 }
 
 func (rw *Rewriter) Rewrite(req *http.Request) {
@@ -57,14 +54,23 @@ func (rw *Rewriter) Rewrite(req *http.Request) {
 }
 
 func proxyHandler(w http.ResponseWriter, req *http.Request) {
-	// Check if the requested URL is in the proxymap. If it is, hijack the request.
+	// Explicitly only allow GET/HEAD/OPTIONS requests, that's all we should support here.
+	if req.Method != http.MethodGet &&
+		req.Method != http.MethodHead &&
+		req.Method != http.MethodOptions {
+		// TODO: log actual error.
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
 
+	// Check if the requested URL is in the proxymap. If it is, hijack the request.
 	if proxyItem, ok := globalProxymap[req.URL.String()]; ok {
 		fmt.Println("Proxying", req.URL, "-->", proxyItem.URL)
 
 		newUrl, err := url.ParseRequestURI(proxyItem.URL)
 		if err != nil {
-			http.Error(w, http.StatusText(500), 500)
+			// TODO: log actual error.
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 		req.URL = newUrl
