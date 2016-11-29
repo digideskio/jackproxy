@@ -1,11 +1,11 @@
 {
-  "http://proxyme/": {
+  "http://proxyme.local/": {
     "url": "http://example.com/",
     "mimetype": "text/html"
   },
-  "http://proxyme/subdir/test.html": {
+  "http://proxyme.local/subdir/test.html": {
     "url": "http://example.com/foo",
-    "mimetype": "text/html"
+    "mimetype": "custom/content-type"
   },
   "http://bad-hostname/bad.html": {
     "url": "http://bad-hostname-destination/bad.html",
