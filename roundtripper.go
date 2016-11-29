@@ -2,8 +2,8 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strconv"
 )
@@ -55,6 +55,8 @@ func (t *CustomRoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 }
 
 func (t *CustomRoundTripper) RoundTripWithRetries(req *http.Request) (*http.Response, error) {
+	portString := strconv.Itoa(*portFlag)
+
 	var response *http.Response
 	var err error
 
@@ -65,11 +67,11 @@ func (t *CustomRoundTripper) RoundTripWithRetries(req *http.Request) (*http.Resp
 			break
 		} else if err == nil {
 			// Error handling: connected to host, but got 5XX responses.
-			fmt.Println("Retrying, got", response.StatusCode, "for:", req.URL.String())
+			log.Println("[jackproxy][", portString, "] Retrying, got", response.StatusCode, "for:", req.URL.String())
 		} else {
 			// Error handling for connections, errors like: dial tcp: lookup example.com: no such host.
 			// Returns a 502 Bad Gateway response if retries don't work.
-			fmt.Println("Retrying, got error (", err, ") for:", req.URL.String())
+			log.Println("[jackproxy][", portString, "] Retrying, got error (", err, ") for:", req.URL.String())
 		}
 	}
 	return response, err

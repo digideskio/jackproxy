@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/vulcand/oxy/forward"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -38,6 +39,8 @@ func normalizeRequestUrl(req *http.Request) {
 }
 
 func proxyHandler(w http.ResponseWriter, req *http.Request) {
+	portString := strconv.Itoa(*portFlag)
+
 	// Explicitly only allow GET/HEAD/OPTIONS requests, that's all we should support here.
 	if req.Method != http.MethodGet &&
 		req.Method != http.MethodHead &&
@@ -57,7 +60,7 @@ func proxyHandler(w http.ResponseWriter, req *http.Request) {
 
 	if proxyItem, ok := globalProxymap[req.URL.String()]; ok {
 		// URL is in the proxy map, hijack the request.
-		fmt.Println("Proxying", req.URL, "-->", proxyItem.URL)
+		log.Println("[jackproxy][", portString, "] Proxying", req.URL, "-->", proxyItem.URL)
 
 		req.Header.Set(internalMimetypeOverrideHeader, proxyItem.Mimetype)
 
@@ -71,14 +74,14 @@ func proxyHandler(w http.ResponseWriter, req *http.Request) {
 	} else {
 		// URL is NOT in the proxy map.
 		if shouldBeProxied || isBlacklistedUrl(req.URL.String()) {
-			fmt.Println("Serving intentional 404 for:", req.URL.String())
+			log.Println("[jackproxy][", portString, "] Serving intentional 404 for:", req.URL.String())
 			// We got a request for a proxied resource, but it's not in the proxymap so we don't know
 			// where the resource exists. Immediately serve 404, otherwise we will attempt to connect
 			// to the non-existent proxy host.
 			http.Error(w, "", http.StatusNotFound)
 			return
 		} else {
-			fmt.Println("Allowing live URL:", req.URL.String())
+			log.Println("[jackproxy][", portString, "] Allowing live URL:", req.URL.String())
 		}
 		// If here, URL is a live URL and is requested without hijacking.
 	}

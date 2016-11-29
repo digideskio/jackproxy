@@ -48,9 +48,8 @@ func injectHtmlFooter(html []byte, footerHtml string) []byte {
 
 func isBlacklistedUrl(url string) bool {
 	prefixBlacklist := []string{
+		// NOTE: this blocks Firefox from downloading a hefty video codec in the background.
 		"http://ciscobinary.openh264.org:80",
-		"http://player.vimeo.com:80",
-		"http://cdn.krxd.net:80/ctjs/controltag.js",
 	}
 	for _, prefix := range prefixBlacklist {
 		if strings.HasPrefix(url, prefix) {
