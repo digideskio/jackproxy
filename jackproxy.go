@@ -70,17 +70,17 @@ func proxyHandler(w http.ResponseWriter, req *http.Request) {
 		req.URL = newUrl
 	} else {
 		// URL is NOT in the proxy map.
-		fmt.Println("Serving 404 for: ", req.URL.String())
-
 		if shouldBeProxied || isBlacklistedUrl(req.URL.String()) {
+			fmt.Println("Serving intentional 404 for:", req.URL.String())
 			// We got a request for a proxied resource, but it's not in the proxymap so we don't know
 			// where the resource exists. Immediately serve 404, otherwise we will attempt to connect
 			// to the non-existent proxy host.
 			http.Error(w, "", http.StatusNotFound)
 			return
+		} else {
+			fmt.Println("Allowing live URL:", req.URL.String())
 		}
-
-		// If here, URL is a live URL and should be requested without hijacking.
+		// If here, URL is a live URL and is requested without hijacking.
 	}
 
 	fwd, _ := forward.New(
