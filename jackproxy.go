@@ -105,6 +105,7 @@ func run() error {
 
 	// Set up syslog.
 	if hook, err := logrus_syslog.NewSyslogHook("", "", syslog.LOG_INFO, ""); err == nil {
+		log.SetFormatter(&log.TextFormatter{DisableColors: true})
 		log.AddHook(hook)
 	} else {
 		return err
