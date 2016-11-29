@@ -1,12 +1,11 @@
 package main
 
 import (
-  "bytes"
-  "fmt"
-  "net/http"
-  "io/ioutil"
-  "strings"
-  "strconv"
+	"bytes"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"strconv"
 )
 
 // An internal-only header that is used to pass information on the request into this round-tripper.
@@ -16,74 +15,62 @@ var internalMimetypeOverrideHeader = "X-Temp-JackProxy-Response-Content-Type"
 // Number of retries for 5XX errors.
 var numRetries = 3
 
-// HTML that will be injected in the footer of all HTML pages.
-const animationStopperHtml = `<style type="text/css">
-*, *::before, *::after {
-  -moz-transition: none !important;
-  transition: none !important;
-  -moz-animation: none !important;
-  animation: none !important;
-}
-</style>`
-
 // Custom transporter that provides response rewriting before headers are flushed by Forwarder.
 type CustomRoundTripper struct{}
 
 func (t *CustomRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-  // Extract the header override before actually making the request. This way, we don't
-  // ever expose it to external services.
-  mimetypeOverride := req.Header.Get(internalMimetypeOverrideHeader)
-  req.Header.Del(internalMimetypeOverrideHeader)
+	// Extract the header override before actually making the request. This way, we don't
+	// ever expose it to external services.
+	mimetypeOverride := req.Header.Get(internalMimetypeOverrideHeader)
+	req.Header.Del(internalMimetypeOverrideHeader)
+	isProxied := mimetypeOverride != ""
 
-  response, err := t.RoundTripWithRetries(req)
-  if err != nil {
-    return response, err
-  }
+	response, err := t.RoundTripWithRetries(req)
+	if err != nil {
+		return response, err
+	}
+	if isProxied {
+		// Override mimetype. This enables serving the same destination with different mimetypes
+		// per request (imagine a file served as text/html in one request and text/plain in another).
+		response.Header.Set("Content-Type", mimetypeOverride)
 
-  // Override the mimetype.
-  if mimetypeOverride != "" {
-    response.Header.Set("Content-Type", mimetypeOverride)
-  }
+		// Per spec, some browsers require that font files are served with the correct Access Control
+		// settings. For now, just set this on all proxied requests since the rendering environment
+		// is a controlled place (note: you would never want to do this in a normal proxy).
+		response.Header.Set("Access-Control-Allow-Origin", "*")
+	}
 
-  // Inject custom HTML.
-  if response.Header.Get("Content-Type") == "text/html" {
-    html, _ := ioutil.ReadAll(response.Body)
-    newHtml := injectHtmlFooter(html, animationStopperHtml)
+	// Inject custom HTML.
+	if response.Header.Get("Content-Type") == "text/html" {
+		html, _ := ioutil.ReadAll(response.Body)
+		newHtml := injectHtmlFooter(html, animationStopperHtml)
 
-    // Since we have already read the body, wrap it with NopCloser so it can be read again.
-    response.Body = ioutil.NopCloser(bytes.NewBuffer(newHtml))
-    response.ContentLength = int64(len(newHtml))
-    response.Header.Set("Content-Length", strconv.Itoa(len(newHtml)))
-  }
+		// Since we have already read the body, wrap it with NopCloser so it can be read again.
+		response.Body = ioutil.NopCloser(bytes.NewBuffer(newHtml))
+		response.ContentLength = int64(len(newHtml))
+		response.Header.Set("Content-Length", strconv.Itoa(len(newHtml)))
+	}
 
-  return response, err
+	return response, err
 }
 
-// RoundTrip method that retries server errors a few times.
 func (t *CustomRoundTripper) RoundTripWithRetries(req *http.Request) (*http.Response, error) {
-  var response *http.Response
-  var err error
+	var response *http.Response
+	var err error
 
-  for i := 0; i <= numRetries; i++ {
-    response, err = http.DefaultTransport.RoundTrip(req)
-    if err != nil {
-      return response, err
-    }
-    if response.StatusCode < 500 {
-      break
-    }
-    fmt.Println("Retrying", response.StatusCode, "response: ", req.URL.String())
-  }
-  return response, err
-}
-
-func injectHtmlFooter(html []byte, footerHtml string) []byte {
-  htmlString := string(html[:])
-  if strings.Contains(htmlString, "</body>") {
-    return []byte(strings.Replace(htmlString, "</body>", footerHtml + "</body>", -1))
-  }
-  if strings.Contains(htmlString, "</html>") {
-    return []byte(strings.Replace(htmlString, "</html>", footerHtml + "</html>", -1))
-  }
-  return html
+	for i := 0; i <= numRetries; i++ {
+		response, err = http.DefaultTransport.RoundTrip(req)
+		if err == nil && response.StatusCode < 500 {
+			// Got a correct response (non-5XX).
+			break
+		} else if err == nil {
+			// Error handling: connected to host, but got 5XX responses.
+			fmt.Println("Retrying, got", response.StatusCode, "for:", req.URL.String())
+		} else {
+			// Error handling for connections, errors like: dial tcp: lookup example.com: no such host.
+			// Returns a 502 Bad Gateway response if retries don't work.
+			fmt.Println("Retrying, got error (", err, ") for:", req.URL.String())
+		}
+	}
+	return response, err
 }

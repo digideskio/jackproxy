@@ -17,7 +17,6 @@ var portFlag = flag.Int("port", 8080, "")
 var proxymapPathFlag = flag.String("proxymap", "", "JSON config file for mapping hijacked paths")
 var proxymeHostnameFlag = flag.String("proxyme-hostname", "proxyme.local", "")
 
-
 // Healthcheck /healthz endpoint for the proxy itself.
 func healthzHandler(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusInternalServerError)
@@ -27,6 +26,20 @@ func healthzHandler(w http.ResponseWriter, req *http.Request) {
 func normalizeRequestUrl(req *http.Request) {
 	// Strip off :80 from hostport to match the proxymap.
 	req.URL.Host = justHostname(req.URL.Host)
+
+	if _, ok := getFromProxymap(req.URL.String()); !ok {
+		// Fallback to non-query param URL if it exists. This helps sources that use query params like
+		// for cache busting and rely on a common static webserver behavior that ignores query params
+		// and still serves the file by path. This behavior is safe to allow and helps support serving
+		// captured resources for static websites.
+		req.URL.RawQuery = ""
+		req.URL.ForceQuery = false
+	}
+}
+
+func getFromProxymap(fullUrl string) (ProxymapItem, bool) {
+	proxyItem, ok := globalProxymap[fullUrl]
+	return proxyItem, ok
 }
 
 func proxyHandler(w http.ResponseWriter, req *http.Request) {
@@ -47,7 +60,7 @@ func proxyHandler(w http.ResponseWriter, req *http.Request) {
 		normalizeRequestUrl(req)
 	}
 
-	if proxyItem, ok := globalProxymap[req.URL.String()]; ok {
+	if proxyItem, ok := getFromProxymap(req.URL.String()); ok {
 		// URL is in the proxy map, hijack the request.
 		fmt.Println("Proxying", req.URL, "-->", proxyItem.URL)
 
@@ -62,10 +75,9 @@ func proxyHandler(w http.ResponseWriter, req *http.Request) {
 		req.URL = newUrl
 	} else {
 		// URL is NOT in the proxy map.
+		fmt.Println("Serving 404 for: ", req.URL.String())
 
-		fmt.Println("Not in proxymap: ", req.URL.String())
-
-		if shouldBeProxied {
+		if shouldBeProxied || isBlacklistedUrl(req.URL.String()) {
 			// We got a request for a proxied resource, but it's not in the proxymap so we don't know
 			// where the resource exists. Immediately serve 404, otherwise we will attempt to connect
 			// to the non-existent proxy host.
@@ -76,7 +88,10 @@ func proxyHandler(w http.ResponseWriter, req *http.Request) {
 		// If here, URL is a live URL and should be requested without hijacking.
 	}
 
-	fwd, _ := forward.New(forward.Rewriter(&customRewriter{}), forward.RoundTripper(&CustomRoundTripper{}))
+	fwd, _ := forward.New(
+		forward.Rewriter(&customRewriter{}),
+		forward.RoundTripper(&CustomRoundTripper{}),
+	)
 	fwd.ServeHTTP(w, req)
 }
 

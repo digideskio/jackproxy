@@ -6,8 +6,7 @@ import (
 	"net/http"
 )
 
-type customRewriter struct {
-}
+type customRewriter struct{}
 
 func (rw *customRewriter) Rewrite(req *http.Request) {
 	// TODO: this is a hack for making oxy copy the request correctly when the path changes.
