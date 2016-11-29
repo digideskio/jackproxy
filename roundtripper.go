@@ -2,8 +2,8 @@ package main
 
 import (
 	"bytes"
+	log "github.com/Sirupsen/logrus"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strconv"
 )
@@ -67,11 +67,11 @@ func (t *CustomRoundTripper) RoundTripWithRetries(req *http.Request) (*http.Resp
 			break
 		} else if err == nil {
 			// Error handling: connected to host, but got 5XX responses.
-			log.Println("[jackproxy][", portString, "] Retrying, got", response.StatusCode, "for:", req.URL.String())
+			log.Info("[jackproxy][", portString, "] Retrying, got ", response.StatusCode, " for: ", req.URL.String())
 		} else {
 			// Error handling for connections, errors like: dial tcp: lookup example.com: no such host.
 			// Returns a 502 Bad Gateway response if retries don't work.
-			log.Println("[jackproxy][", portString, "] Retrying, got error (", err, ") for:", req.URL.String())
+			log.Info("[jackproxy][", portString, "] Retrying, got error (", err, ") for: ", req.URL.String())
 		}
 	}
 	return response, err

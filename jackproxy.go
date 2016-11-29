@@ -3,9 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
+	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
 	"github.com/vulcand/oxy/forward"
 	"io"
-	"log"
+	"log/syslog"
 	"net/http"
 	"net/url"
 	"os"
@@ -60,7 +62,7 @@ func proxyHandler(w http.ResponseWriter, req *http.Request) {
 
 	if proxyItem, ok := globalProxymap[req.URL.String()]; ok {
 		// URL is in the proxy map, hijack the request.
-		log.Println("[jackproxy][", portString, "] Proxying", req.URL, "-->", proxyItem.URL)
+		log.Info("[jackproxy][", portString, "] Proxying ", req.URL, " --> ", proxyItem.URL)
 
 		req.Header.Set(internalMimetypeOverrideHeader, proxyItem.Mimetype)
 
@@ -74,14 +76,14 @@ func proxyHandler(w http.ResponseWriter, req *http.Request) {
 	} else {
 		// URL is NOT in the proxy map.
 		if shouldBeProxied || isBlacklistedUrl(req.URL.String()) {
-			log.Println("[jackproxy][", portString, "] Serving intentional 404 for:", req.URL.String())
+			log.Info("[jackproxy][", portString, "] Serving intentional 404 for: ", req.URL.String())
 			// We got a request for a proxied resource, but it's not in the proxymap so we don't know
 			// where the resource exists. Immediately serve 404, otherwise we will attempt to connect
 			// to the non-existent proxy host.
 			http.Error(w, "", http.StatusNotFound)
 			return
 		} else {
-			log.Println("[jackproxy][", portString, "] Allowing live URL:", req.URL.String())
+			log.Info("[jackproxy][", portString, "] Allowing live URL: ", req.URL.String())
 		}
 		// If here, URL is a live URL and is requested without hijacking.
 	}
@@ -96,10 +98,19 @@ func proxyHandler(w http.ResponseWriter, req *http.Request) {
 func run() error {
 	flag.Parse()
 
+	// Parse the proxymap and store it.
 	if err := setupGlobalProxymap(*proxymapPathFlag); err != nil {
 		return err
 	}
 
+	// Set up syslog.
+	if hook, err := logrus_syslog.NewSyslogHook("", "", syslog.LOG_INFO, ""); err == nil {
+		log.AddHook(hook)
+	} else {
+		return err
+	}
+
+	// Run the proxy.
 	http.HandleFunc("/healthz", healthzHandler)
 	http.HandleFunc("/", proxyHandler)
 	http.ListenAndServe("127.0.0.1:"+strconv.Itoa(*portFlag), nil)
