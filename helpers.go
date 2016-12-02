@@ -10,10 +10,10 @@ import (
 // HTML that will be injected in the footer of all HTML pages.
 const animationStopperHtml = `<style type="text/css">
 *, *::before, *::after {
-	-moz-transition: none !important;
-	transition: none !important;
-	-moz-animation: none !important;
-	animation: none !important;
+  -moz-transition: none !important;
+  transition: none !important;
+  -moz-animation: none !important;
+  animation: none !important;
 }
 </style>`
 
