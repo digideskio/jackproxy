@@ -3,8 +3,8 @@ package main
 import (
 	"github.com/vulcand/oxy/forward"
 	"github.com/vulcand/oxy/utils"
-	"net/http"
 	"net"
+	"net/http"
 )
 
 type customRewriter struct{}

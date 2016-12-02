@@ -47,12 +47,13 @@ func proxyHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet &&
 		req.Method != http.MethodHead &&
 		req.Method != http.MethodOptions {
-		// TODO: log actual error.
+		log.Error("[jackproxy][", portString, "] ", req.Method, " not allowed for: ", req.URL.String())
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
 	}
 
 	// Transform the request to force some local requests to the correct proxied address.
+	originalUrl := req.URL.String()
 	proxifyIfLocalRequest(req)
 
 	shouldBeProxied := strings.HasPrefix(req.URL.String(), "http://"+*proxymeHostnameFlag)
@@ -62,7 +63,7 @@ func proxyHandler(w http.ResponseWriter, req *http.Request) {
 
 	if proxyItem, ok := globalProxymap[req.URL.String()]; ok {
 		// URL is in the proxy map, hijack the request.
-		log.Info("[jackproxy][", portString, "] Proxying ", req.URL, " --> ", proxyItem.URL)
+		log.Info("[jackproxy][", portString, "] Proxying ", originalUrl, " --> ", proxyItem.URL)
 
 		req.Header.Set(internalMimetypeOverrideHeader, proxyItem.Mimetype)
 
@@ -76,7 +77,7 @@ func proxyHandler(w http.ResponseWriter, req *http.Request) {
 	} else {
 		// URL is NOT in the proxy map.
 		if shouldBeProxied || isBlacklistedUrl(req.URL.String()) {
-			log.Info("[jackproxy][", portString, "] Serving intentional 404 for: ", req.URL.String())
+			log.Info("[jackproxy][", portString, "] Serving intentional 404 for: ", originalUrl)
 			// We got a request for a proxied resource, but it's not in the proxymap so we don't know
 			// where the resource exists. Immediately serve 404, otherwise we will attempt to connect
 			// to the non-existent proxy host.
@@ -102,6 +103,9 @@ func run() error {
 	if err := setupGlobalProxymap(*proxymapPathFlag); err != nil {
 		return err
 	}
+
+	// Make sure the current proxyme hostname is marked as local, so it doesn't need any DNS lookups.
+	markHostnamesLocal("localhost", "127.0.0.1", "testserver", *proxymeHostnameFlag)
 
 	// Set up syslog.
 	if hook, err := logrus_syslog.NewSyslogHook("", "", syslog.LOG_INFO, ""); err == nil {

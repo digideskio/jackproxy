@@ -1,0 +1,36 @@
+hash: 88118a372d4aa654f1b5a30fce7c6bd28b9e4e8f23705168f75212f580b143b0
+updated: 2016-12-01T23:19:59.528685824-08:00
+imports:
+- name: github.com/orcaman/concurrent-map
+  version: c00bc11d3715eded4bdbd4476efbbac286738e6e
+- name: github.com/Sirupsen/logrus
+  version: 881bee4e20a5d11a6a88a5667c6f292072ac1963
+  subpackages:
+  - hooks/syslog
+- name: github.com/vulcand/oxy
+  version: 9d07313adea3bb9c7817ea887df6ac79648675f9
+  subpackages:
+  - forward
+  - utils
+- name: golang.org/x/sys
+  version: d5645953809d8b4752afb2c3224b1f1ad73dfa70
+  subpackages:
+  - unix
+testImports:
+- name: github.com/gopherjs/gopherjs
+  version: e34a5cd6a1bc7c4fde759f2d3039852fc68b5fcc
+  subpackages:
+  - js
+- name: github.com/jtolds/gls
+  version: 8ddce2a84170772b95dd5d576c48d517b22cac63
+- name: github.com/smartystreets/assertions
+  version: e60cfa771e3f4d18723a4119f1833898c9c62066
+  subpackages:
+  - internal/go-render/render
+  - internal/oglematchers
+- name: github.com/smartystreets/goconvey
+  version: 3c2572876754c4669ae7417b219f0b30a29b32c7
+  subpackages:
+  - convey
+  - convey/gotest
+  - convey/reporting

@@ -1,0 +1,14 @@
+package: jackproxy
+import:
+- package: github.com/Sirupsen/logrus
+  subpackages:
+  - hooks/syslog
+- package: github.com/orcaman/concurrent-map
+- package: github.com/vulcand/oxy
+  subpackages:
+  - forward
+  - utils
+testImport:
+- package: github.com/smartystreets/goconvey
+  subpackages:
+  - convey
