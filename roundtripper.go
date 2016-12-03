@@ -4,8 +4,10 @@ import (
 	"bytes"
 	log "github.com/Sirupsen/logrus"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 // An internal-only header that is used to pass information on the request into this round-tripper.
@@ -14,6 +16,18 @@ var internalMimetypeOverrideHeader = "X-Temp-JackProxy-Response-Content-Type"
 
 // Number of retries for 5XX errors.
 var numRetries = 3
+
+var CustomTransport http.RoundTripper = &http.Transport{
+	Proxy: http.ProxyFromEnvironment,
+	DialContext: (&net.Dialer{
+		Timeout:   15 * time.Second,
+		KeepAlive: 60 * time.Second,
+	}).DialContext,
+	MaxIdleConns:          100,
+	IdleConnTimeout:       45 * time.Second,
+	TLSHandshakeTimeout:   10 * time.Second,
+	ExpectContinueTimeout: 1 * time.Second,
+}
 
 // Custom transporter that provides response rewriting before headers are flushed by Forwarder.
 type CustomRoundTripper struct{}
@@ -61,7 +75,7 @@ func (t *CustomRoundTripper) RoundTripWithRetries(req *http.Request) (*http.Resp
 	var err error
 
 	for i := 0; i <= numRetries; i++ {
-		response, err = http.DefaultTransport.RoundTrip(req)
+		response, err = CustomTransport.RoundTrip(req)
 		if err == nil && response.StatusCode < 500 {
 			// Got a correct response (non-5XX).
 			break
